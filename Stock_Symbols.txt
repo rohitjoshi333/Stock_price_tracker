@@ -1,0 +1,48 @@
+## **📌 US Tech Stocks**
+
+| Company                   | Symbol    |
+| ------------------------- | --------- |
+| Apple                     | **AAPL**  |
+| Microsoft                 | **MSFT**  |
+| Google (Alphabet Class A) | **GOOGL** |
+| Google (Alphabet Class C) | **GOOG**  |
+| Amazon                    | **AMZN**  |
+| Nvidia                    | **NVDA**  |
+| Tesla                     | **TSLA**  |
+| Meta (Facebook)           | **META**  |
+| Netflix                   | **NFLX**  |
+| Intel                     | **INTC**  |
+| AMD                       | **AMD**   |
+
+---
+
+## 📌 **Finance**
+
+| Company         | Symbol   |
+| --------------- | -------- |
+| JP Morgan       | **JPM**  |
+| Bank of America | **BAC**  |
+| Mastercard      | **MA**   |
+| Visa            | **V**    |
+| PayPal          | **PYPL** |
+
+---
+
+## 📌 **Popular Index Funds**
+
+| Index            | Symbol    |
+| ---------------- | --------- |
+| S&P 500          | **^GSPC** |
+| Dow Jones        | **^DJI**  |
+| Nasdaq Composite | **^IXIC** |
+
+---
+
+## 📌 **Crypto (via Yahoo Finance)**
+
+| Coin     | Symbol      |
+| -------- | ----------- |
+| Bitcoin  | **BTC-USD** |
+| Ethereum | **ETH-USD** |
+| Solana   | **SOL-USD** |
+

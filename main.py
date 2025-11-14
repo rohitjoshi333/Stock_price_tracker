@@ -4,7 +4,7 @@ import tracker
 
 root = tk.Tk()
 root.title("📈 Stock Price Tracker")
-root.geometry("420x400")
+root.geometry("420x150")
 root.resizable(False, False)
 
 tk.Label(root, text="Stock Symbol (e.g., AAPL, TSLA):").pack(pady=5)
