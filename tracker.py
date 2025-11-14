@@ -22,37 +22,3 @@ def plot_stock_data(data, symbol):
     plt.legend()
     plt.grid(True)
     plt.show()
-
-# Send email alert (optional)
-def send_email_alert(stock_name, current_price, target_price, receiver_email):
-    sender_email = "your_email@gmail.com"
-    sender_password = "your_app_password"  # Use Gmail app password
-
-    subject = f"Stock Alert: {stock_name} Price Update"
-    body = f"{stock_name} current price is ${current_price:.2f}, which crossed your target ${target_price:.2f}."
-
-    msg = MIMEMultipart()
-    msg["From"] = sender_email
-    msg["To"] = receiver_email
-    msg["Subject"] = subject
-    msg.attach(MIMEText(body, "plain"))
-
-    try:
-        with smtplib.SMTP("smtp.gmail.com", 587) as server:
-            server.starttls()
-            server.login(sender_email, sender_password)
-            server.send_message(msg)
-        print("✅ Email alert sent!")
-    except Exception as e:
-        print(f"❌ Failed to send email: {e}")
-
-# Check price and alert
-def check_price_and_alert(symbol, target_price, receiver_email):
-    stock = yf.Ticker(symbol)
-    current_price = stock.history(period="1d")["Close"].iloc[-1]
-
-    if current_price >= target_price:
-        send_email_alert(symbol, current_price, target_price, receiver_email)
-        return f"Alert sent! {symbol} reached ${current_price:.2f}"
-    else:
-        return f"{symbol} current price ${current_price:.2f} is below target ${target_price:.2f}"
