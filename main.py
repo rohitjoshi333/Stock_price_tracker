@@ -7,8 +7,12 @@ root.title("📈 Stock Price Tracker")
 root.geometry("420x150")
 root.resizable(False, False)
 
-tk.Label(root, text="Stock Symbol (e.g., AAPL, TSLA):").pack(pady=5)
-symbol_entry = tk.Entry(root, width=40)
+# Create a container frame with padding so widgets are spaced from the window edges.
+container = tk.Frame(root, padx=20, pady=10)
+container.pack(expand=True, fill="both")
+
+tk.Label(container, text="Stock Symbol (e.g., AAPL, TSLA, MSFT):").pack(pady=5)
+symbol_entry = tk.Entry(container, width=40)
 symbol_entry.pack()
 
 def fetch_and_plot():
@@ -24,6 +28,6 @@ def fetch_and_plot():
     except Exception as e:
         messagebox.showerror("Error", f"Failed to fetch data: {e}")
 
-tk.Button(root, text="Fetch & Plot Data", command=fetch_and_plot).pack(pady=10)
+tk.Button(container, text="Fetch & Plot Data", command=fetch_and_plot).pack(pady=10)
 
 root.mainloop()
