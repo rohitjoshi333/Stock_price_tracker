@@ -2,5 +2,7 @@ yfinance
 matplotlib
 pandas
 requests
+# Optional: interactive hover tooltips for the plot
+mplcursors
 # Note: `tkinter` is part of the Python standard library on most platforms
 # and `smtplib` is also stdlib — they don't need to be installed via pip.

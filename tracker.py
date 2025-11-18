@@ -6,6 +6,8 @@ import yfinance as yf
 import pandas as pd
 import matplotlib.pyplot as plt
 from pathlib import Path
+from matplotlib import dates as mdates
+from matplotlib import ticker as mticker
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -113,7 +115,7 @@ def get_usd_to_npr_rate(timeout: float = 5.0):
     return default_rate, "default"
 
 
-def plot_stock_data(data: pd.DataFrame, symbol: str, save_path: Optional[str] = None):
+def plot_stock_data(data: pd.DataFrame, symbol: str, ax=None, save_path: Optional[str] = None):
     """Plot closing price trend in NPR.
 
     Converts the `Close` prices from USD to NPR using a live rate and returns
@@ -130,24 +132,91 @@ def plot_stock_data(data: pd.DataFrame, symbol: str, save_path: Optional[str] = 
     # Convert close prices to NPR
     close_npr = data["Close"] * rate
 
-    plt.ioff()
-    fig, ax = plt.subplots(figsize=(9, 4))
-    ax.plot(data.index, close_npr, label=f"{symbol} Closing Prices (NPR)")
-    ax.set_title(f"{symbol} Stock Price Trend — Prices in NPR")
-    ax.set_xlabel("Date")
-    ax.set_ylabel("Price (NPR)")
-    ax.legend()
-    ax.grid(True)
+    # Improve styling for readability
+    try:
+        plt.style.use("seaborn-darkgrid")
+    except Exception:
+        pass
+
+    # If no axes provided, create a new figure/axes and we will show it.
+    created_fig = False
+    if ax is None:
+        plt.ioff()
+        fig, ax = plt.subplots(figsize=(11, 5), dpi=100)
+        created_fig = True
+    else:
+        fig = ax.figure
+
+    # plot main line
+    line = ax.plot(data.index, close_npr, label=f"{symbol} Closing Prices (NPR)", linewidth=2.5, color="#1f77b4")[0]
+    # plot a short moving average to show trend
+    try:
+        ma = close_npr.rolling(window=7, min_periods=1).mean()
+        ax.plot(data.index, ma, label="7-day MA", linewidth=1.6, color="#ff7f0e", alpha=0.9)
+    except Exception:
+        ma = None
+
+    # gentle area fill under the curve for emphasis
+    ax.fill_between(data.index, close_npr, alpha=0.08, color="#1f77b4")
+
+    # Highlight latest value
+    last_date = data.index[-1]
+    last_val = float(close_npr.iloc[-1])
+    ax.scatter([last_date], [last_val], color="#d62728", zorder=6)
+    ax.annotate(f"Rs {last_val:,.2f}", xy=(last_date, last_val), xytext=(-80, 12), textcoords="offset points",
+                arrowprops=dict(arrowstyle="->", color="#555555"), bbox=dict(boxstyle="round,pad=0.3", fc="white", alpha=0.9), fontsize=10)
+
+    # Titles and labels
+    ax.set_title(f"{symbol} Stock Price Trend — Prices in NPR", fontsize=14, weight="bold")
+    ax.set_xlabel("Date", fontsize=11)
+    ax.set_ylabel("Price (NPR)", fontsize=11)
+
+    # Format x-axis dates and rotate for readability
+    locator = mdates.AutoDateLocator()
+    formatter = mdates.ConciseDateFormatter(locator)
+    ax.xaxis.set_major_locator(locator)
+    ax.xaxis.set_major_formatter(formatter)
+    for label in ax.get_xticklabels():
+        label.set_rotation(30)
+        label.set_horizontalalignment('right')
+
+    # Format y-axis with thousand separators and INR symbol
+    def yfmt(x, pos):
+        if abs(x) >= 1000:
+            return f"Rs {x:,.0f}"
+        return f"Rs {x:,.2f}"
+
+    ax.yaxis.set_major_formatter(mticker.FuncFormatter(yfmt))
+
+    ax.legend(fontsize=10)
+    ax.grid(True, alpha=0.6)
+
+    # Try to enable hover tooltips with mplcursors if available
+    try:
+        import mplcursors
+
+        cursor = mplcursors.cursor(line, hover=True)
+
+        @cursor.connect("add")
+        def _(sel):
+            y = sel.target[1]
+            sel.annotation.set_text(f"Rs {y:,.2f}")
+            sel.annotation.get_bbox_patch().set_alpha(0.9)
+    except Exception:
+        logger.debug("mplcursors not available or failed to attach; skipping hover tooltips")
 
     if save_path:
         fig.savefig(save_path)
 
-    try:
-        plt.show(block=False)
-        plt.pause(0.001)
-    except Exception:
-        logger.exception("Non-blocking show failed; attempting blocking show")
-        plt.show()
+    # If we created the figure locally, show it non-blocking as before. If
+    # the caller provided axes (embedding in a GUI), we won't call show here.
+    if created_fig:
+        try:
+            plt.show(block=False)
+            plt.pause(0.001)
+        except Exception:
+            logger.exception("Non-blocking show failed; attempting blocking show")
+            plt.show()
 
-    # Return rate and its source so the caller can surface that information.
-    return rate, source
+    # Return rate, source and the used figure/axes so the caller can embed them.
+    return rate, source, fig, ax

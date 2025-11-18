@@ -5,6 +5,8 @@ from tkinter import messagebox, ttk
 import tracker
 import logging
 from pathlib import Path
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
+import matplotlib
 
 logging.basicConfig(level=logging.INFO)
 
@@ -43,6 +45,17 @@ class StockTrackerApp(tk.Tk):
         self.fetch_btn = ttk.Button(container, text="Fetch & Plot", command=self.on_fetch_clicked)
         self.fetch_btn.grid(row=1, column=0, columnspan=2, pady=8)
 
+        # Frame for plot canvas
+        self.plot_frame = tk.Frame(container)
+        self.plot_frame.grid(row=3, column=0, columnspan=2, sticky="nsew", pady=(8, 0))
+
+        # allow plot frame to expand
+        container.rowconfigure(3, weight=1)
+        container.columnconfigure(1, weight=1)
+
+        self.canvas = None
+        self.toolbar = None
+
         # status bar
         self.status_var = tk.StringVar(value="Idle")
         status_label = ttk.Label(container, textvariable=self.status_var, relief=tk.SUNKEN, anchor="w")
@@ -80,7 +93,37 @@ class StockTrackerApp(tk.Tk):
         # Re-enable button
         self.fetch_btn.config(state="normal")
         try:
-            rate, source = tracker.plot_stock_data(data, symbol)
+            # If we already have a canvas, reuse its figure/axes. Otherwise create new figure/axes.
+            if self.canvas and hasattr(self, "plot_ax"):
+                ax = self.plot_ax
+                ax.clear()
+                rate, source, fig, ax = tracker.plot_stock_data(data, symbol, ax=ax)
+                fig = ax.figure
+            else:
+                # create a blank figure/axes and let tracker draw into it
+                fig = matplotlib.figure.Figure(figsize=(11, 5), dpi=100)
+                ax = fig.add_subplot(111)
+                rate, source, fig, ax = tracker.plot_stock_data(data, symbol, ax=ax)
+
+            # embed or update canvas
+            if not self.canvas:
+                self.canvas = FigureCanvasTkAgg(fig, master=self.plot_frame)
+                self.canvas.draw()
+                self.canvas.get_tk_widget().pack(fill="both", expand=True)
+                try:
+                    self.toolbar = NavigationToolbar2Tk(self.canvas, self.plot_frame)
+                    self.toolbar.update()
+                    self.toolbar.pack(side="bottom", fill="x")
+                except Exception:
+                    pass
+            else:
+                # update existing canvas with new figure
+                self.canvas.figure = fig
+                self.canvas.draw()
+
+            # store axes for reuse
+            self.plot_ax = ax
+
             # show the exchange rate used in the status and whether it was live or fallback
             src_label = "(live)" if source == "live" else f"({source})"
             self.set_status(f"Plot displayed for {symbol} — USD→NPR: {rate:.2f} {src_label}")
