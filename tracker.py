@@ -114,7 +114,6 @@ def get_usd_to_npr_rate(timeout: float = 5.0):
     logger.warning("Using default USD->NPR rate: %s", default_rate)
     return default_rate, "default"
 
-
 def plot_stock_data(data: pd.DataFrame, symbol: str, ax=None, save_path: Optional[str] = None):
     """Plot closing price trend in NPR.
 
@@ -193,7 +192,8 @@ def plot_stock_data(data: pd.DataFrame, symbol: str, ax=None, save_path: Optiona
 
     # Try to enable hover tooltips with mplcursors if available
     try:
-        import mplcursors
+        import importlib
+        mplcursors = importlib.import_module("mplcursors")
 
         cursor = mplcursors.cursor(line, hover=True)
 

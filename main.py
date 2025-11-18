@@ -28,8 +28,8 @@ class StockTrackerApp(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("📈 Stock Price Tracker")
-        self.geometry("480x180")
-        self.resizable(False, False)
+        self.geometry("400x200")
+        self.resizable(True, True)
 
         container = tk.Frame(self, padx=16, pady=12)
         container.pack(expand=True, fill="both")
@@ -45,23 +45,21 @@ class StockTrackerApp(tk.Tk):
         self.fetch_btn = ttk.Button(container, text="Fetch & Plot", command=self.on_fetch_clicked)
         self.fetch_btn.grid(row=1, column=0, columnspan=2, pady=8)
 
-        # Frame for plot canvas
-        self.plot_frame = tk.Frame(container)
-        self.plot_frame.grid(row=3, column=0, columnspan=2, sticky="nsew", pady=(8, 0))
-
-        # allow plot frame to expand
-        container.rowconfigure(3, weight=1)
-        container.columnconfigure(1, weight=1)
-
-        self.canvas = None
-        self.toolbar = None
-
         # status bar
         self.status_var = tk.StringVar(value="Idle")
         status_label = ttk.Label(container, textvariable=self.status_var, relief=tk.SUNKEN, anchor="w")
         status_label.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(8, 0))
 
         container.columnconfigure(1, weight=1)
+
+        # Frame for embedded plot
+        self.plot_frame = tk.Frame(container, bd=1, relief=tk.FLAT)
+        self.plot_frame.grid(row=3, column=0, columnspan=2, sticky="nsew", pady=(8, 0))
+        container.rowconfigure(3, weight=1)
+
+        self.canvas = None
+        self.toolbar = None
+        self.plot_ax = None
 
     def set_status(self, text):
         self.status_var.set(text)
@@ -93,23 +91,24 @@ class StockTrackerApp(tk.Tk):
         # Re-enable button
         self.fetch_btn.config(state="normal")
         try:
-            # If we already have a canvas, reuse its figure/axes. Otherwise create new figure/axes.
-            if self.canvas and hasattr(self, "plot_ax"):
+            # If we already have axes, reuse them
+            if self.plot_ax is not None:
                 ax = self.plot_ax
                 ax.clear()
                 rate, source, fig, ax = tracker.plot_stock_data(data, symbol, ax=ax)
                 fig = ax.figure
             else:
-                # create a blank figure/axes and let tracker draw into it
+                # create a figure and axes and let tracker draw into it
                 fig = matplotlib.figure.Figure(figsize=(11, 5), dpi=100)
                 ax = fig.add_subplot(111)
                 rate, source, fig, ax = tracker.plot_stock_data(data, symbol, ax=ax)
 
-            # embed or update canvas
+            # embed or update the canvas
             if not self.canvas:
                 self.canvas = FigureCanvasTkAgg(fig, master=self.plot_frame)
                 self.canvas.draw()
-                self.canvas.get_tk_widget().pack(fill="both", expand=True)
+                widget = self.canvas.get_tk_widget()
+                widget.pack(fill="both", expand=True)
                 try:
                     self.toolbar = NavigationToolbar2Tk(self.canvas, self.plot_frame)
                     self.toolbar.update()
@@ -117,14 +116,13 @@ class StockTrackerApp(tk.Tk):
                 except Exception:
                     pass
             else:
-                # update existing canvas with new figure
+                # update existing canvas
                 self.canvas.figure = fig
                 self.canvas.draw()
 
-            # store axes for reuse
+            # save axes for reuse
             self.plot_ax = ax
 
-            # show the exchange rate used in the status and whether it was live or fallback
             src_label = "(live)" if source == "live" else f"({source})"
             self.set_status(f"Plot displayed for {symbol} — USD→NPR: {rate:.2f} {src_label}")
         except Exception as e:
