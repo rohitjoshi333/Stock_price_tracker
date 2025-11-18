@@ -5,6 +5,7 @@ import requests
 import yfinance as yf
 import pandas as pd
 import matplotlib.pyplot as plt
+from pathlib import Path
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -33,27 +34,86 @@ def fetch_stock_data(symbol: str, period: str = "1mo") -> pd.DataFrame:
     return data
 
 
-def get_usd_to_npr_rate(timeout: float = 5.0) -> float:
-    """Get the USD -> NPR exchange rate from a free public API.
+def get_usd_to_npr_rate(timeout: float = 5.0):
+    """Get the USD -> NPR exchange rate, trying multiple public APIs.
 
-    Uses exchangerate.host which requires no API key. If the request fails,
-    raises RuntimeError.
+    Returns a tuple `(rate: float, source: str)` where `source` indicates where
+    the rate came from: 'live', 'cache', or 'default'. On success the rate is
+    cached to `last_npr_rate.txt` so the app can still convert prices when the
+    network/API is unavailable.
     """
-    url = "https://api.exchangerate.host/convert?from=USD&to=NPR"
+    cache_file = "last_npr_rate.txt"
+
+    # Try exchangerate.host convert endpoint first
     try:
+        url = "https://api.exchangerate.host/convert?from=USD&to=NPR"
         resp = requests.get(url, timeout=timeout)
         resp.raise_for_status()
         data = resp.json()
         rate = data.get("info", {}).get("rate")
-        if not rate:
-            raise RuntimeError("No rate returned from exchange API")
-        return float(rate)
-    except Exception as e:
-        logger.exception("Failed to fetch USD->NPR rate: %s", e)
-        raise RuntimeError("Failed to fetch exchange rate") from e
+        if rate:
+            rate = float(rate)
+            try:
+                Path(cache_file).write_text(str(rate))
+            except Exception:
+                logger.debug("Could not write rate cache file")
+            return rate, "live"
+    except Exception:
+        logger.exception("Failed to fetch USD->NPR rate from exchangerate.host")
+
+    # Try exchangerate.host latest endpoint as fallback
+    try:
+        url = "https://api.exchangerate.host/latest?base=USD&symbols=NPR"
+        resp = requests.get(url, timeout=timeout)
+        resp.raise_for_status()
+        data = resp.json()
+        rate = data.get("rates", {}).get("NPR")
+        if rate:
+            rate = float(rate)
+            try:
+                Path(cache_file).write_text(str(rate))
+            except Exception:
+                logger.debug("Could not write rate cache file")
+            return rate, "live"
+    except Exception:
+        logger.exception("Failed to fetch USD->NPR rate from exchangerate.host latest")
+
+    # Try another free API (er-api)
+    try:
+        url = "https://open.er-api.com/v6/latest/USD"
+        resp = requests.get(url, timeout=timeout)
+        resp.raise_for_status()
+        data = resp.json()
+        rate = data.get("rates", {}).get("NPR")
+        if rate:
+            rate = float(rate)
+            try:
+                Path(cache_file).write_text(str(rate))
+            except Exception:
+                logger.debug("Could not write rate cache file")
+            return rate, "live"
+    except Exception:
+        logger.exception("Failed to fetch USD->NPR rate from er-api")
+
+    # If all live attempts failed, try reading a cached rate
+    try:
+        p = Path(cache_file)
+        if p.exists():
+            txt = p.read_text().strip()
+            if txt:
+                rate = float(txt)
+                logger.warning("Using cached USD->NPR rate: %s", rate)
+                return rate, "cache"
+    except Exception:
+        logger.exception("Failed to read cached rate file")
+
+    # Final fallback to a safe default
+    default_rate = 140.0
+    logger.warning("Using default USD->NPR rate: %s", default_rate)
+    return default_rate, "default"
 
 
-def plot_stock_data(data: pd.DataFrame, symbol: str, save_path: Optional[str] = None) -> float:
+def plot_stock_data(data: pd.DataFrame, symbol: str, save_path: Optional[str] = None):
     """Plot closing price trend in NPR.
 
     Converts the `Close` prices from USD to NPR using a live rate and returns
@@ -64,8 +124,8 @@ def plot_stock_data(data: pd.DataFrame, symbol: str, save_path: Optional[str] = 
 
     logger.info("Plotting data for %s", symbol)
 
-    # Get conversion rate USD -> NPR
-    rate = get_usd_to_npr_rate()
+    # Get conversion rate USD -> NPR (may return cached/default)
+    rate, source = get_usd_to_npr_rate()
 
     # Convert close prices to NPR
     close_npr = data["Close"] * rate
@@ -89,4 +149,5 @@ def plot_stock_data(data: pd.DataFrame, symbol: str, save_path: Optional[str] = 
         logger.exception("Non-blocking show failed; attempting blocking show")
         plt.show()
 
-    return rate
+    # Return rate and its source so the caller can surface that information.
+    return rate, source
