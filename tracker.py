@@ -1,6 +1,7 @@
 import logging
 from typing import Optional
 
+import requests
 import yfinance as yf
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -32,22 +33,49 @@ def fetch_stock_data(symbol: str, period: str = "1mo") -> pd.DataFrame:
     return data
 
 
-def plot_stock_data(data: pd.DataFrame, symbol: str, save_path: Optional[str] = None):
-    """Plot closing price trend for a fetched dataset.
+def get_usd_to_npr_rate(timeout: float = 5.0) -> float:
+    """Get the USD -> NPR exchange rate from a free public API.
 
-    Uses non-blocking show where possible (`block=False`). If `save_path` is given,
-    the plot will also be saved to that file.
+    Uses exchangerate.host which requires no API key. If the request fails,
+    raises RuntimeError.
+    """
+    url = "https://api.exchangerate.host/convert?from=USD&to=NPR"
+    try:
+        resp = requests.get(url, timeout=timeout)
+        resp.raise_for_status()
+        data = resp.json()
+        rate = data.get("info", {}).get("rate")
+        if not rate:
+            raise RuntimeError("No rate returned from exchange API")
+        return float(rate)
+    except Exception as e:
+        logger.exception("Failed to fetch USD->NPR rate: %s", e)
+        raise RuntimeError("Failed to fetch exchange rate") from e
+
+
+def plot_stock_data(data: pd.DataFrame, symbol: str, save_path: Optional[str] = None) -> float:
+    """Plot closing price trend in NPR.
+
+    Converts the `Close` prices from USD to NPR using a live rate and returns
+    the rate used. Raises RuntimeError if conversion rate cannot be fetched.
     """
     if data is None or data.empty:
         raise ValueError("No data to plot")
 
     logger.info("Plotting data for %s", symbol)
+
+    # Get conversion rate USD -> NPR
+    rate = get_usd_to_npr_rate()
+
+    # Convert close prices to NPR
+    close_npr = data["Close"] * rate
+
     plt.ioff()
     fig, ax = plt.subplots(figsize=(9, 4))
-    ax.plot(data.index, data["Close"], label=f"{symbol} Closing Prices")
-    ax.set_title(f"{symbol} Stock Price Trend")
+    ax.plot(data.index, close_npr, label=f"{symbol} Closing Prices (NPR)")
+    ax.set_title(f"{symbol} Stock Price Trend — Prices in NPR")
     ax.set_xlabel("Date")
-    ax.set_ylabel("Price (USD)")
+    ax.set_ylabel("Price (NPR)")
     ax.legend()
     ax.grid(True)
 
@@ -55,10 +83,10 @@ def plot_stock_data(data: pd.DataFrame, symbol: str, save_path: Optional[str] = 
         fig.savefig(save_path)
 
     try:
-        # Try to show non-blocking; some backends may still block.
         plt.show(block=False)
-        # brief pause to allow the window to render in some environments
         plt.pause(0.001)
     except Exception:
         logger.exception("Non-blocking show failed; attempting blocking show")
         plt.show()
+
+    return rate

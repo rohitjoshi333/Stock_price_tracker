@@ -80,8 +80,9 @@ class StockTrackerApp(tk.Tk):
         # Re-enable button
         self.fetch_btn.config(state="normal")
         try:
-            tracker.plot_stock_data(data, symbol)
-            self.set_status(f"Plot displayed for {symbol}.")
+            rate = tracker.plot_stock_data(data, symbol)
+            # show the exchange rate used in the status
+            self.set_status(f"Plot displayed for {symbol} (USD→NPR: {rate:.2f})")
         except Exception as e:
             logging.exception("Plotting failed")
             messagebox.showerror("Error", f"Plotting failed: {e}")

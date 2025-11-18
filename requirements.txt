@@ -1,5 +1,6 @@
 yfinance
 matplotlib
 pandas
-tkinter
-smtplib
+requests
+# Note: `tkinter` is part of the Python standard library on most platforms
+# and `smtplib` is also stdlib — they don't need to be installed via pip.
